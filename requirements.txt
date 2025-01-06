@@ -1,1 +1,5 @@
 shodan
+dash
+plotly
+pandas
+python-dotenv

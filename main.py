@@ -1,13 +1,32 @@
-import shodan;
+from dotenv import load_dotenv
+from shodan import Shodan
+from os import environ;
+from dash import Dash, dcc, html
 
-sd = "ZGPti2tIIZakDP9qrAIzPmdkyfz3DOp7"
+def main():
+    shodan = initializeShodan()
+    launchApp(shodan)
 
-api = shodan.Shodan(sd)
 
-try:
-    results = api.search("camera france")
+def initializeShodan() -> Shodan:
+    load_dotenv()
     
-    print(results['matches'][0])
+    key = environ.get('SHODAN_API_KEY')
+    
+    if not key:
+        raise Exception("No API key was found. Verify the .env file.")
+    
+    return Shodan(key)
 
-except shodan.APIError as e:
-    print(e)
+def launchApp(shodan: Shodan):
+    app = Dash(__name__)
+    #
+    app.layout = html.Div(
+        children=[
+            html.H1(children="SERVER")
+        ]
+    )
+    app.run_server()
+
+if __name__ == "__main__":
+    main()
