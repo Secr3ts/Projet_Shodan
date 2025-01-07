@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from gzip import decompress
 from math import ceil
+from os import getenv
 from pathlib import Path
 from typing import Callable
 
-import pandas as pd
+from pandas import DataFrame, read_csv, to_numeric
 from requests import RequestException, get, head
 from shodan import APIError, Shodan
 
@@ -16,7 +17,10 @@ def get_data(
     raw_path: Path = Path("./", "data", "raw"),
 ) -> None:
     # TODO(Aloïs FOURNIER): create dirs !!!
-    # get_shodan_data(shodan)
+    create_directories()
+
+    if "dev" not in getenv("ENV"):
+        get_shodan_data(shodan)
     v_commune_path: Path = download_data(
         "https://www.insee.fr/fr/statistiques/fichier/7766585/v_commune_2024.csv",
         raw_path / "v_commune_2024.csv",
@@ -34,10 +38,23 @@ def get_data(
     )
     files_raw = [crimes_france_path, french_deps_path]
     for file in files_raw:
-        clean_data(file)
+        clean_data(file, v_commune_path)
+    cleanup_data(Path("./", "data", "raw"))
 
 
-def decompress_gz(path: Path) -> None:
+def create_directories() -> None:
+    data_path = Path("./", "data")
+    if not data_path.exists():
+        data_path.mkdir()
+    raw_path = data_path / "raw"
+    cleaned_path = data_path / "cleaned"
+    if not raw_path.exists():
+        raw_path.mkdir()
+    if not cleaned_path.exists():
+        cleaned_path.mkdir()
+
+
+def decompress_gz(path: Path) -> Path:
     with path.open("rb") as gz:
         compressed = gz.read()
         decompressed = decompress(compressed)
@@ -45,17 +62,80 @@ def decompress_gz(path: Path) -> None:
         with decompressed_path.open("wb") as decompressed_file:
             decompressed_file.write(decompressed)
     path.unlink()
+    return decompressed_path
 
 
-def clean_data(file: Path) -> None:
+def clean_data(file: Path, french_cities: Path) -> None:
     match file.suffix:
         case ".csv":
-            
-            return
+            clean_csv_data(file, french_cities)
         case ".geojson":
-            file_dest = Path("./", "data", "cleaned", file.parts[-1])
-            file.rename(file_dest)
-            return
+            move_geojson_file(file)
+
+
+def clean_csv_data(file: Path, french_cities: Path) -> None:
+    # Process CSV Data
+    crimes_df = read_csv(file, delimiter=";", decimal=",")
+    # Convert year to int and prepend "20"
+    crimes_df["annee"] = crimes_df["annee"].apply(lambda x: int(f"20{x:02d}"))
+
+    # Handle geographical codes
+    crimes_df["CODGEO_2024"] = crimes_df["CODGEO_2024"].astype(str).str.zfill(5)
+
+    # Convert numeric columns with French decimal format
+    numeric_cols = {
+        "faits": float,
+        "tauxpourmille": float,
+        "complementinfoval": float,
+        "complementinfotaux": float,
+        "POP": int,
+        "millPOP": int,
+        "LOG": float,  # Using float as scientific notation is present
+        "millLOG": int,
+    }
+
+    for col, dtype in numeric_cols.items():
+        if col in crimes_df.columns:
+            crimes_df[col] = to_numeric(crimes_df[col], errors="coerce").astype(dtype)
+
+    ndiff_mask = crimes_df["valeur.publiée"] == "ndiff"
+    crimes_df.loc[ndiff_mask, "faits"] = crimes_df.loc[ndiff_mask, "complementinfoval"]
+    crimes_df.loc[ndiff_mask, "tauxpourmille"] = crimes_df.loc[
+        ndiff_mask, "complementinfotaux"
+    ]
+    cat_cols = ["classe", "unité.de.compte", "valeur.publiée"]
+    crimes_df[cat_cols] = crimes_df[cat_cols].astype("category")
+    crimes_df = crimes_df.drop(["complementinfoval", "complementinfotaux"], axis=1)
+    crimes_df = (
+        crimes_df.groupby(["CODGEO_2024", "annee"]).sum(numeric_only=True).reset_index()
+    )
+
+    # Load French cities data
+    communes_cols = ["COM", "NCCENR"]
+    french_cities_df = read_csv(french_cities, usecols=communes_cols)
+
+    # Merge dataframes to replace CODGEO_2024 with NCCENR
+    merged_df = crimes_df.merge(
+        french_cities_df, left_on="CODGEO_2024", right_on="COM", how="left")
+    merged_df["CODGEO_2024"] = merged_df["NCCENR"]
+    merged_df = merged_df.drop(
+        columns=["COM", "NCCENR", "POP", "millPOP", "LOG", "millLOG", "tauxpourmille"])
+    merged_df = merged_df.rename(
+        columns={"CODGEO_2024": "City", "annee": "Year", "faits": "Cases"})
+    merged_df.to_csv(Path("./", "data", "cleaned", file.parts[-1]), index=False)
+
+
+def move_geojson_file(file: Path) -> None:
+    file_dest = Path("./", "data", "cleaned", file.parts[-1])
+    if not file_dest.exists():
+        file_dest.touch()
+    file.rename(file_dest)
+
+
+def cleanup_data(directory: Path) -> None:
+    for file in directory.iterdir():
+        if file.is_file():
+            file.unlink()
 
 
 def download_data(
@@ -72,7 +152,7 @@ def download_data(
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
             if callback:
-                callback(save_path)
+                return callback(save_path)
             return save_path
     except (RequestException, APIError) as e:
         print(e)
@@ -110,7 +190,7 @@ def get_shodan_data(shodan: Shodan, tries: int = 1) -> None:
             cleaned_data.extend(clean_shodan_result(result))
 
         # Convert cleaned data to DataFrame
-        shodan_df = pd.DataFrame(cleaned_data)
+        shodan_df = DataFrame(cleaned_data)
         print(shodan_df)
     except APIError as e:
         print(e)
@@ -122,7 +202,7 @@ def fallback_to_json() -> None:
         with Path("./", "data", "backup", "shodan_camera_fr.json").open(mode="r") as f:
             data = json.load(f)
             cleaned_data = clean_shodan_result(data)
-            shodan_df = pd.DataFrame(cleaned_data)
+            shodan_df = DataFrame(cleaned_data)
             print(shodan_df)
     except (json.JSONDecodeError, FileNotFoundError) as e:
         print(f"Failed to load fallback JSON: {e}")
