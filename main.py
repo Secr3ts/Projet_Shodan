@@ -1,11 +1,13 @@
 from dotenv import load_dotenv
 from shodan import Shodan
-from os import environ;
+from os import environ
 from dash import Dash, dcc, html
+from get_data import get_data
 
 def main():
     shodan = initializeShodan()
-    launchApp(shodan)
+    get_data(shodan)
+    # launchApp(shodan)
 
 
 def initializeShodan() -> Shodan:
