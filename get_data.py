@@ -19,7 +19,7 @@ def get_data(
     # TODO(Aloïs FOURNIER): create dirs !!!
     create_directories()
 
-    if "dev" not in getenv("ENV"):
+    if "dev" in getenv("ENV"):
         get_shodan_data(shodan)
     v_commune_path: Path = download_data(
         "https://www.insee.fr/fr/statistiques/fichier/7766585/v_commune_2024.csv",
@@ -52,6 +52,12 @@ def create_directories() -> None:
         raw_path.mkdir()
     if not cleaned_path.exists():
         cleaned_path.mkdir()
+    for entry in raw_path.iterdir():
+        if entry.is_file():
+            entry.unlink()
+    for entry in cleaned_path.iterdir():
+        if entry.is_file():
+            entry.unlink()
 
 
 def decompress_gz(path: Path) -> Path:
@@ -101,8 +107,7 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
     ndiff_mask = crimes_df["valeur.publiée"] == "ndiff"
     crimes_df.loc[ndiff_mask, "faits"] = crimes_df.loc[ndiff_mask, "complementinfoval"]
     crimes_df.loc[ndiff_mask, "tauxpourmille"] = crimes_df.loc[
-        ndiff_mask, "complementinfotaux"
-    ]
+        ndiff_mask, "complementinfotaux"]
     cat_cols = ["classe", "unité.de.compte", "valeur.publiée"]
     crimes_df[cat_cols] = crimes_df[cat_cols].astype("category")
     crimes_df = crimes_df.drop(["complementinfoval", "complementinfotaux"], axis=1)
@@ -127,8 +132,6 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
 
 def move_geojson_file(file: Path) -> None:
     file_dest = Path("./", "data", "cleaned", file.parts[-1])
-    if not file_dest.exists():
-        file_dest.touch()
     file.rename(file_dest)
 
 
@@ -173,7 +176,7 @@ def get_shodan_data(shodan: Shodan, tries: int = 1) -> None:
         return
 
     try:
-        count = shodan.count("camera country:fr")
+        count = shodan.count("camera country:fr before:2024-01-01s")
 
         # 100 results per page
         total_pages = ceil(count["total"] / 100)
@@ -191,7 +194,7 @@ def get_shodan_data(shodan: Shodan, tries: int = 1) -> None:
 
         # Convert cleaned data to DataFrame
         shodan_df = DataFrame(cleaned_data)
-        print(shodan_df)
+        shodan_df.to_csv(Path("./", "data", "cleaned", "shodan_camera_fr.csv"))
     except APIError as e:
         print(e)
         get_shodan_data(shodan, tries + 1)
@@ -213,14 +216,14 @@ def clean_shodan_result(shodan_result: dict) -> list:
 
     for match in shodan_result.get("matches", []):
         cleaned_result = {
-            "ip_str": match.get("ip_str"),
-            "city": match.get("location", {}).get("city"),
-            "region_code": match.get("location", {}).get("region_code"),
-            "longitude": match.get("location", {}).get("longitude"),
-            "latitude": match.get("location", {}).get("latitude"),
-            "timestamp": match.get("timestamp"),
-            "org": match.get("org"),
-            "domains": match.get("domains"),
+            "IP": match.get("ip_str"),
+            "City": match.get("location", {}).get("city"),
+            "Region": match.get("location", {}).get("region_code"),
+            "Longitude": match.get("location", {}).get("longitude"),
+            "Latitude": match.get("location", {}).get("latitude"),
+            "Timestamp": match.get("timestamp"),
+            "Org": match.get("org"),
+            "Domains": match.get("domains"),
         }
         cleaned_results.append(cleaned_result)
 

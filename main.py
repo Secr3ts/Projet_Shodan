@@ -1,3 +1,4 @@
+import sys
 from os import environ
 
 from dash import Dash, html
@@ -8,23 +9,27 @@ from get_data import get_data
 
 
 def main() -> None:
-    shodan = initializeShodan()
+    shodan = initialize_shodan()
     get_data(shodan)
     # launchApp(shodan)
 
 
-def initializeShodan() -> Shodan:
+def initialize_shodan() -> Shodan:
     load_dotenv()
 
-    key = environ.get("SHODAN_API_KEY")
-
-    if not key:
+    keys = environ.get("SHODAN_API_KEY")
+    if not keys:
         raise Exception("No API key was found. Verify the .env file.")
 
-    return Shodan(key)
+    keys = keys.split(",")
+
+    for key in keys:
+        if Shodan(key).info()["usage_limits"]["scan_credits"] < 1:
+            ic
+    sys.exit()
 
 
-def launchApp(shodan: Shodan):
+def launch_app(shodan: Shodan):
     app = Dash(__name__)
     app.layout = html.Div(children=[html.H1(children="SERVER")])
     app.run_server()
