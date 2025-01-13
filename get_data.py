@@ -13,14 +13,13 @@ from shodan import APIError, Shodan
 
 
 def get_data(
-    shodan: Shodan,
+    valid_keys: list[str],
     raw_path: Path = Path("./", "data", "raw"),
 ) -> None:
     # TODO(Aloïs FOURNIER): create dirs !!!
     create_directories()
 
-    if "dev" in getenv("ENV"):
-        get_shodan_data(shodan)
+    get_shodan_data(valid_keys)
     v_commune_path: Path = download_data(
         "https://www.insee.fr/fr/statistiques/fichier/7766585/v_commune_2024.csv",
         raw_path / "v_commune_2024.csv",
@@ -169,17 +168,19 @@ def download_data(
 MAX_TRIES = 5
 
 
-def get_shodan_data(shodan: Shodan, tries: int = 1) -> None:
+def get_shodan_data(valid_keys: list[str], tries: int = 1) -> None:
     if tries > MAX_TRIES:
         print("max tries reached, Falling back to the JSON")
         fallback_to_json()
         return
-
+    shodan = Shodan(valid_keys[0])
+    # 10 results per page, 1 query credit per 100 results, 10 pages per api full api key
     try:
         count = shodan.count("camera country:fr before:2024-01-01s")
 
         # 100 results per page
         total_pages = ceil(count["total"] / 100)
+        
         cleaned_data = []
 
         for i in range(1):
