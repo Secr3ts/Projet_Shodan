@@ -9,26 +9,21 @@ from get_data import get_data
 
 
 def main() -> None:
-    shodan = initialize_shodan()
-    get_data(shodan)
-    # launchApp(shodan)
+    shodan_clients = initialize_shodan()
+    get_data(shodan_clients)
+    # launchApp(shodan_clients[0])
 
 
-def initialize_shodan() -> Shodan:
+def initialize_shodan() -> list[Shodan]:
     load_dotenv()
 
     keys = environ.get("SHODAN_API_KEY")
     print(keys)
     if not keys:
-        msg = "No API key was found. Verify the .env file."
-        raise Exception(msg)
-    valid_keys = []
-    for key in keys:
-        if Shodan(key).info()["usage_limits"]["query_credits"] < 1:
-            break
-        valid_keys.append(key)
-    return 
+        raise Exception("No API key was found. Verify the .env file.")
 
+    keys = keys.split(",")
+    return [Shodan(key) for key in keys]
 
 def launch_app(shodan: Shodan):
     app = Dash(__name__)

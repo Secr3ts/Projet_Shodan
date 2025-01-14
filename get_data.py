@@ -13,13 +13,13 @@ from shodan import APIError, Shodan
 
 
 def get_data(
-    valid_keys: list[str],
+    shodan_clients: list[Shodan],
     raw_path: Path = Path("./", "data", "raw"),
 ) -> None:
-    # TODO(Aloïs FOURNIER): create dirs !!!
     create_directories()
 
-    get_shodan_data(valid_keys)
+    if "dev" in getenv("ENV"):
+        get_shodan_data(shodan_clients)
     v_commune_path: Path = download_data(
         "https://www.insee.fr/fr/statistiques/fichier/7766585/v_commune_2024.csv",
         raw_path / "v_commune_2024.csv",
@@ -166,39 +166,59 @@ def download_data(
 
 
 MAX_TRIES = 5
+RESULTS_LIMIT = 100  # Adjust this value to limit the number of results per page
 
 
-def get_shodan_data(valid_keys: list[str], tries: int = 1) -> None:
+def get_shodan_data(
+    shodan_clients: list[Shodan],
+    tries: int = 1,
+    start_page: int = 1) -> None:
     if tries > MAX_TRIES:
         print("max tries reached, Falling back to the JSON")
         fallback_to_json()
         return
-    shodan = Shodan(valid_keys[0])
+    shodan = shodan_clients[0]
     # 10 results per page, 1 query credit per 100 results, 10 pages per api full api key
     try:
-        count = shodan.count("camera country:fr before:2024-01-01s")
+        shodan = shodan_clients[0]
+        count = shodan.count("camera country:fr before:2024-01-01")
 
         # 100 results per page
-        total_pages = ceil(count["total"] / 100)
-        
+        total_pages = ceil(count["total"] / RESULTS_LIMIT)
         cleaned_data = []
 
-        for i in range(1):
-            result = shodan.search("camera country:fr", page=i)
+        for i in range(start_page, total_pages + 1):
+            try:
+                result = shodan.search("camera country:fr before:2024-01-01", page=i)
 
-            if "matches" not in result:
-                print("No matches. Falling back to the JSON")
-                fallback_to_json()
-                break
+                if "matches" not in result:
+                    print("No matches. Falling back to the JSON")
+                    fallback_to_json()
+                    break
 
-            cleaned_data.extend(clean_shodan_result(result))
+                cleaned_data.extend(clean_shodan_result(result))
+            except APIError as e:
+                print(f"APIError: {e}")
+                if "query credits" in str(e).lower():
+                    if len(shodan_clients) > 1:
+                        shodan_clients.pop(0)
+                        print("Switching to next API key")
+                        get_shodan_data(shodan_clients, tries, start_page=i)
+                        return
+                    else:
+                        print("No more API keys available")
+                        fallback_to_json()
+                        return
 
         # Convert cleaned data to DataFrame
         shodan_df = DataFrame(cleaned_data)
-        shodan_df.to_csv(Path("./", "data", "cleaned", "shodan_camera_fr.csv"))
+        shodan_df.to_csv(
+            Path("./", "data", "cleaned", "shodan_camera_fr.csv"),
+            mode="a",
+            header=False)
     except APIError as e:
         print(e)
-        get_shodan_data(shodan, tries + 1)
+        get_shodan_data(shodan_clients, tries + 1, start_page)
 
 
 def fallback_to_json() -> None:
@@ -229,9 +249,3 @@ def clean_shodan_result(shodan_result: dict) -> list:
         cleaned_results.append(cleaned_result)
 
     return cleaned_results
-
-
-# Example usage
-if __name__ == "__main__":
-    api = Shodan("YOUR_API_KEY")
-    get_data(api)
