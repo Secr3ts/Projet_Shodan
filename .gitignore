@@ -1,2 +1,5 @@
 .vscode/
 .env
+data/
+__pycache__/
+.DS_STORE
