@@ -1,12 +1,12 @@
 from dotenv import load_dotenv
 from shodan import Shodan
-from os import environ;
+from os import environ
 from dash import Dash, dcc, html
+from layout import layout
 
 def main():
     shodan = initializeShodan()
     launchApp(shodan)
-
 
 def initializeShodan() -> Shodan:
     load_dotenv()
@@ -19,14 +19,19 @@ def initializeShodan() -> Shodan:
     return Shodan(key)
 
 def launchApp(shodan: Shodan):
-    app = Dash(__name__)
-    #
-    app.layout = html.Div(
-        children=[
-            html.H1(children="SERVER")
-        ]
+    external_script = [
+        "https://cdn.tailwindcss.com"
+    ]
+    
+    app = Dash(
+        __name__,
+        external_scripts=external_script,
     )
-    app.run_server()
+    app.scripts.config.serve_locally = True
+    
+    app.layout = layout
+    
+    app.run_server(debug=True)
 
 if __name__ == "__main__":
     main()
