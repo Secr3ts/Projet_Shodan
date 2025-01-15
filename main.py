@@ -14,18 +14,21 @@ def main() -> None:
     # launchApp(shodan_clients[0])
 
 
+class ShodanInitializationError(Exception):
+    pass
+
+
 def initialize_shodan() -> list[Shodan]:
     load_dotenv()
-
     keys = environ.get("SHODAN_API_KEY")
-    print(keys)
     if not keys:
-        raise Exception("No API key was found. Verify the .env file.")
+        error_msg = "Verify the .env file."
+        raise ShodanInitializationError(Exception(error_msg))
 
     keys = keys.split(",")
     return [Shodan(key) for key in keys]
 
-def launch_app(shodan: Shodan):
+def launch_app() -> None:
     app = Dash(__name__)
     app.layout = html.Div(children=[html.H1(children="SERVER")])
     app.run_server()

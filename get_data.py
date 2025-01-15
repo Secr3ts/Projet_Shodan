@@ -5,6 +5,7 @@ from gzip import decompress
 from math import ceil
 from os import getenv
 from pathlib import Path
+import sys
 from typing import Callable
 
 from pandas import DataFrame, read_csv, to_numeric
@@ -80,7 +81,22 @@ def clean_data(file: Path, french_cities: Path) -> None:
 
 def clean_csv_data(file: Path, french_cities: Path) -> None:
     # Process CSV Data
-    crimes_df = read_csv(file, delimiter=";", decimal=",")
+    dtype = {
+        "CODGEO_2024": str,
+        "annee": int,
+        "classe": str,
+        "unité.de.compte": str,
+        "valeur.publiée": str,
+        "tauxpourmille": object,
+        "faits": float,
+        "complementinfoval": str,
+        "complementinfotaux": str,
+        "POP": int,
+        "millPOP": int,
+        "LOG": object,
+        "millLOG": int,
+    }
+    crimes_df = read_csv(file, delimiter=";", decimal=",", dtype=dtype)
     # Convert year to int and prepend "20"
     crimes_df["annee"] = crimes_df["annee"].apply(lambda x: int(f"20{x:02d}"))
 
@@ -106,7 +122,9 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
     ndiff_mask = crimes_df["valeur.publiée"] == "ndiff"
     crimes_df.loc[ndiff_mask, "faits"] = crimes_df.loc[ndiff_mask, "complementinfoval"]
     crimes_df.loc[ndiff_mask, "tauxpourmille"] = crimes_df.loc[
-        ndiff_mask, "complementinfotaux"]
+        ndiff_mask,
+        "complementinfotaux",
+    ]
     cat_cols = ["classe", "unité.de.compte", "valeur.publiée"]
     crimes_df[cat_cols] = crimes_df[cat_cols].astype("category")
     crimes_df = crimes_df.drop(["complementinfoval", "complementinfotaux"], axis=1)
@@ -120,12 +138,18 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
 
     # Merge dataframes to replace CODGEO_2024 with NCCENR
     merged_df = crimes_df.merge(
-        french_cities_df, left_on="CODGEO_2024", right_on="COM", how="left")
+        french_cities_df,
+        left_on="CODGEO_2024",
+        right_on="COM",
+        how="left",
+    )
     merged_df["CODGEO_2024"] = merged_df["NCCENR"]
     merged_df = merged_df.drop(
-        columns=["COM", "NCCENR", "POP", "millPOP", "LOG", "millLOG", "tauxpourmille"])
+        columns=["COM", "NCCENR", "POP", "millPOP", "LOG", "millLOG", "tauxpourmille"],
+    )
     merged_df = merged_df.rename(
-        columns={"CODGEO_2024": "City", "annee": "Year", "faits": "Cases"})
+        columns={"CODGEO_2024": "City", "annee": "Year", "faits": "Cases"},
+    )
     merged_df.to_csv(Path("./", "data", "cleaned", file.parts[-1]), index=False)
 
 
@@ -165,14 +189,15 @@ def download_data(
         print(f"Backup file {backup_path} not found.")
 
 
-MAX_TRIES = 5
+MAX_TRIES = 0
 RESULTS_LIMIT = 100  # Adjust this value to limit the number of results per page
 
 
 def get_shodan_data(
     shodan_clients: list[Shodan],
     tries: int = 1,
-    start_page: int = 1) -> None:
+    start_page: int = 1,
+) -> None:
     if tries > MAX_TRIES:
         print("max tries reached, Falling back to the JSON")
         fallback_to_json()
@@ -205,17 +230,17 @@ def get_shodan_data(
                         print("Switching to next API key")
                         get_shodan_data(shodan_clients, tries, start_page=i)
                         return
-                    else:
-                        print("No more API keys available")
-                        fallback_to_json()
-                        return
+                    print("No more API keys available")
+                    fallback_to_json()
+                    return
 
         # Convert cleaned data to DataFrame
         shodan_df = DataFrame(cleaned_data)
         shodan_df.to_csv(
             Path("./", "data", "cleaned", "shodan_camera_fr.csv"),
             mode="a",
-            header=False)
+            header=False,
+        )
     except APIError as e:
         print(e)
         get_shodan_data(shodan_clients, tries + 1, start_page)
@@ -223,17 +248,55 @@ def get_shodan_data(
 
 def fallback_to_json() -> None:
     try:
-        with Path("./", "data", "backup", "shodan_camera_fr.json").open(mode="r") as f:
-            data = json.load(f)
-            cleaned_data = clean_shodan_result(data)
-            shodan_df = DataFrame(cleaned_data)
-            print(shodan_df)
+        cleaned_data = []
+        with Path(
+            "./",
+            "data",
+            "backup",
+            "raw",
+            "shodan_camera_fr.json",
+        ).open(mode="r") as f:
+            lines = f.readlines()
+            for line in lines:
+                data = json.loads(line)
+                cleaned_data.extend(clean_shodan_result(data, fallback=True))
+            shodan_df = DataFrame(
+                cleaned_data,
+                columns=[
+                    "IP",
+                    "City",
+                    "Region",
+                    "Latitude",
+                    "Longitude",
+                    "Timestamp",
+                    "Org",
+                    "Domains",
+                ],
+            )
+            shodan_df.to_csv(
+                Path("./", "data", "cleaned", "shodan_camera_fr.csv"),
+                index=False,
+            )
     except (json.JSONDecodeError, FileNotFoundError) as e:
         print(f"Failed to load fallback JSON: {e}")
 
 
-def clean_shodan_result(shodan_result: dict) -> list:
+def clean_shodan_result(shodan_result: dict, *, fallback: bool = False) -> list:
     cleaned_results = []
+
+    if fallback:
+        return [
+            {
+                "IP": shodan_result.get("ip_str"),
+                "City": shodan_result.get("location", {}).get("city"),
+                "Region": shodan_result.get("location", {}).get("region_code"),
+                "Longitude": shodan_result.get("location", {}).get("longitude"),
+                "Latitude": shodan_result.get("location", {}).get("latitude"),
+                "Timestamp": shodan_result.get("timestamp"),
+                "Org": shodan_result.get("org"),
+                "Domains": shodan_result.get("domains"),
+            },
+        ]
 
     for match in shodan_result.get("matches", []):
         cleaned_result = {
