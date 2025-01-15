@@ -145,7 +145,7 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
     )
     merged_df["CODGEO_2024"] = merged_df["NCCENR"]
     merged_df = merged_df.drop(
-        columns=["COM", "NCCENR", "POP", "millPOP", "LOG", "millLOG", "tauxpourmille"],
+        columns=["COM", "NCCENR", "millPOP", "LOG", "millLOG", "tauxpourmille"],
     )
     merged_df = merged_df.rename(
         columns={"CODGEO_2024": "City", "annee": "Year", "faits": "Cases"},
