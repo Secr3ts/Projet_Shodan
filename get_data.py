@@ -5,7 +5,6 @@ from gzip import decompress
 from math import ceil
 from os import getenv
 from pathlib import Path
-import sys
 from typing import Callable
 
 from pandas import DataFrame, read_csv, to_numeric
