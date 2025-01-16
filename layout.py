@@ -1,22 +1,38 @@
+import geopandas as gpd
+import pandas as pd
 import plotly.express as px
 from dash import dcc, html
-from data_loader import load_csv_data, filter_french_data
 
-DATA_FILE = "data/test_data.csv"
-df = load_csv_data(DATA_FILE)
-french_data = filter_french_data(df)
+GEOJSON_FILE = "data/cleaned/french_communes.geojson"
+geo_data = gpd.read_file(GEOJSON_FILE)
 
-map_fig = px.scatter_mapbox(
-    french_data,
-    lat="Latitude",
-    lon="Longitude",
-    hover_name="City",
-    hover_data={"Organization": True, "IP Address": True, "Country": False},
-    color_discrete_sequence=["blue"],
+CRIME_DATA_FILE = "data/cleaned/crimes_france_2.csv"
+crime_data = pd.read_csv(CRIME_DATA_FILE)
+
+crime_summary = crime_data.groupby("City")["Cases"].mean().reset_index()
+
+geo_data = geo_data.merge(crime_summary, how="left", left_on="libgeo", right_on="City")
+
+geo_data["Cases"] = geo_data["Cases"].fillna(0)
+
+min_value = geo_data["Cases"].quantile(0.1)
+max_value = geo_data["Cases"].quantile(0.9)
+
+map_fig = px.choropleth_mapbox(
+    geo_data,
+    geojson=geo_data.geometry,
+    locations=geo_data.index,
+    color="Cases",
+    color_continuous_scale=["#00ff00", "#ffff00", "#ff0000"],
+    range_color=(min_value, max_value),
+    hover_name="libgeo",
+    hover_data={"Cases": True, "City": False},
+    mapbox_style="open-street-map",
     zoom=5,
-    height=600,
+    center={"lat": 46.603354, "lon": 1.888334},
+    opacity=0.6,
 )
-map_fig.update_layout(mapbox_style="open-street-map")
+
 map_fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
 
 layout = html.Div(
@@ -42,13 +58,16 @@ layout = html.Div(
             draggable="false",
             className="absolute top-0 -right-[800px] select-none",
         ),
-        html.H1("Carte de France des Données", className="text-3xl font-bold flex justify-end mr-16 items-center row-start-1 row-end-2 col-start-4	col-end-7"),
+        html.H1(
+            "Carte des Crimes en France",
+            className="text-3xl font-bold flex justify-end mr-16 items-center row-start-1 row-end-2 col-start-4 col-end-7",
+        ),
         html.Div(
             children=[
                 html.Div(
                     children=[
                         html.Label("Informations : "),
-                        html.Div(id="info-display", children="Cliquez sur un point pour voir les informations."),
+                        html.Div(id="info-display", children="Cliquez sur une commune pour voir les informations."),
                     ],
                     className="gradient-content rounded",
                 ),
@@ -58,12 +77,7 @@ layout = html.Div(
         dcc.Graph(
             id="france-map",
             figure=map_fig,
-            className="row-start-2 row-end-7 col-start-3 col-end-7 rounded-md shadow-md overflow-hidden",
+            className="row-start-2 row-end-12 col-start-3 col-end-7 rounded-md shadow-md overflow-hidden",
         ),
-        dcc.Graph(
-            id="france-map-2",
-            figure=map_fig,
-            className="row-start-7 row-end-12 col-start-3 col-end-7 rounded-md shadow-md overflow-hidden",
-        ),
-    ]
+    ],
 )
