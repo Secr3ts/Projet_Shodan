@@ -1,21 +1,17 @@
-import sys
 from os import environ
 
-from dash import Dash, html
+from dash import Dash
 from dotenv import load_dotenv
 from shodan import Shodan
 
+from callback import register_callbacks
 from get_data import get_data
+from layout import create_layout
 
-from os import environ
-from dash import Dash, dcc, html
-from layout import layout
 
 def main() -> None:
     shodan_clients = initialize_shodan()
     get_data(shodan_clients)
-    # launchApp(shodan_clients[0])
-
 
 def initialize_shodan() -> list[Shodan]:
     load_dotenv()
@@ -28,21 +24,23 @@ def initialize_shodan() -> list[Shodan]:
     keys = keys.split(",")
     return [Shodan(key) for key in keys]
 
-def launch_app(shodan: Shodan):
+def create_app():
     external_script = [
-        "https://cdn.tailwindcss.com"
+        "https://cdn.tailwindcss.com",
     ]
-    
+
     app = Dash(
         __name__,
         external_scripts=external_script,
     )
     app.scripts.config.serve_locally = True
-    
-    app.layout = layout
-    
-    app.run_server(debug=True)
 
+    app.layout = create_layout()
+
+    register_callbacks(app)
+
+    return app
 
 if __name__ == "__main__":
-    main()
+    app = create_app()
+    app.run_server(debug=True)
