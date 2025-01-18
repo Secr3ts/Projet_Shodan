@@ -5,7 +5,7 @@ from dash import Dash, html
 from dotenv import load_dotenv
 from shodan import Shodan
 
-from get_data import get_data
+from src.utils.get_data import get_data
 
 
 def main() -> None:
