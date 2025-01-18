@@ -5,6 +5,7 @@ from gzip import decompress
 from math import ceil
 from os import getenv
 from pathlib import Path
+from re import compile as recompile
 from typing import Callable
 
 from pandas import DataFrame, read_csv, to_numeric
@@ -17,6 +18,8 @@ def get_data(
     raw_path: Path = Path("./", "data", "raw"),
 ) -> None:
     create_directories()
+
+    get_osm_data("http://overpass-api.de/api/interpreter")
 
     if "dev" in getenv("ENV"):
         get_shodan_data(shodan_clients)
@@ -244,6 +247,60 @@ def get_shodan_data(
         print(e)
         get_shodan_data(shodan_clients, tries + 1, start_page)
 
+
+def get_osm_data(endpoint_url: str) -> None:
+    query = """
+    [out:json];
+    (
+      node["man_made"="surveillance"](48.815573, 2.224199, 51.124199, 5.142222);
+    );
+    out body;
+    >;
+    out skel qt;
+    """
+
+    try:
+        response = get(endpoint_url, params={"data": query})
+        response.raise_for_status()  # Raise an error for bad responses
+        data = response.json()
+
+        els = data.get("elements", [])
+
+        clean_osm_data(els)
+    except RequestException as e:
+        print("Request error: " + str(e))
+    except json.JSONDecodeError as e:
+        print("JSON decode error: " + str(e))
+
+
+def clean_osm_data(data: dict[any: any]) -> None:
+    osm_df = DataFrame(data)
+    osm_df["tags"] = osm_df["tags"].apply(extract_date)
+    osm_df = osm_df.drop(columns=["type", "id"])
+    osm_df = osm_df.rename(columns={"lat": "Lat", "lon": "Lon", "tags": "Timestamp"})
+    osm_df.to_csv("./data/cleaned/osm_cleaned.csv", index=False)
+
+
+def extract_date(tag: any) -> str:
+    date_keys = ["date", "start"]
+    date_pattern = recompile(r"^\d{4}-\d{2}")
+    if isinstance(tag, dict):
+        for key, value in tag.items():
+            if any(date_key in key.lower() for date_key in date_keys):
+                match = date_pattern.match(value)
+                if match:
+                    return match.group(0)
+    elif isinstance(tag, str):
+        try:
+            tag_d = json.loads(tag.replace("'", '"'))
+            for key, value in tag_d.items():
+                if any(date_key in key.lower() for date_key in date_keys):
+                    match = date_pattern.match(value)
+                    if match:
+                        return match.group(0)
+        except json.JSONDecodeError:
+            pass
+    return None
 
 def fallback_to_json() -> None:
     try:
