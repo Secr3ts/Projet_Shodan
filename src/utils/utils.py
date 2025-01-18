@@ -1,3 +1,4 @@
+"""Utilitary functions for the project."""
 from gzip import decompress
 from json import JSONDecodeError, loads
 from pathlib import Path
@@ -5,7 +6,8 @@ from pathlib import Path
 from pandas import DataFrame
 
 
-def create_directories() -> None:
+def setup_directories() -> None:
+    """Create required directories and deletes previous data."""
     data_path = Path("./", "data")
     if not data_path.exists():
         data_path.mkdir()
@@ -23,6 +25,10 @@ def create_directories() -> None:
             entry.unlink()
 
 def decompress_gz(path: Path) -> Path:
+    """Decomperss a GZip and returns the path.
+
+    :param path Path: Archive path
+    """
     with path.open("rb") as gz:
         compressed = gz.read()
         decompressed = decompress(compressed)
@@ -33,16 +39,28 @@ def decompress_gz(path: Path) -> Path:
     return decompressed_path
 
 def move_geojson_file(file: Path) -> None:
+    """Move GeoJSON file to cleaned.
+
+    :param file Path: the GeoJSON file
+    """
     file_dest = Path("./", "data", "cleaned", file.parts[-1])
     file.rename(file_dest)
 
 
 def cleanup_data(directory: Path) -> None:
+    """Clean data from a given directory.
+
+    :param directory Path: the directory to clean
+    """
     for file in directory.iterdir():
         if file.is_file():
             file.unlink()
 
 def fallback_to_json(callback: callable) -> None:
+    """Fallback to the Shodan JSON in case of API Outage for example.
+
+    :param callback callable: callback for data cleaning
+    """
     try:
         cleaned_data = []
         with Path(

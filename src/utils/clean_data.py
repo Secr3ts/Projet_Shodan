@@ -1,14 +1,21 @@
-from pathlib import Path  # noqa: I001
+"""clean_data module provides functions to clean the data needed for the dashboard."""
+from __future__ import annotations
+
+from json import JSONDecodeError, loads
+from pathlib import Path
+from re import compile as recompile
 
 from pandas import DataFrame, read_csv, to_numeric
 
 from src.utils.utils import move_geojson_file
 
-from re import compile as recompile
-
-from json import loads, JSONDecodeError
 
 def clean_data(file: Path, french_cities: Path) -> None:
+    """Clean the base CSV/GeoJSON data.
+
+    :param Path file: File to clean
+    :param Path french_cities: File used to cross-reference cities with file.
+    """
     match file.suffix:
         case ".csv":
             clean_csv_data(file, french_cities)
@@ -16,7 +23,12 @@ def clean_data(file: Path, french_cities: Path) -> None:
             move_geojson_file(file)
 
 def clean_csv_data(file: Path, french_cities: Path) -> None:
-    # Process CSV Data
+    """Clean the crimes csv.
+
+    :param Path file: File to clean
+    :param Path french_cities: File used to cross-reference cities with file.
+    """
+    # DataTypes for CSV
     dtype = {
         "CODGEO_2024": str,
         "annee": int,
@@ -32,13 +44,13 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
         "LOG": object,
         "millLOG": int,
     }
+
+    # Reads the csv
     crimes_df = read_csv(file, delimiter=";", decimal=",", dtype=dtype)
     # Convert year to int and prepend "20"
     crimes_df["annee"] = crimes_df["annee"].apply(lambda x: int(f"20{x:02d}"))
-
     # Handle geographical codes
     crimes_df["CODGEO_2024"] = crimes_df["CODGEO_2024"].astype(str).str.zfill(5)
-
     # Convert numeric columns with French decimal format
     numeric_cols = {
         "faits": float,
@@ -47,7 +59,7 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
         "complementinfotaux": float,
         "POP": int,
         "millPOP": int,
-        "LOG": float,  # Using float as scientific notation is present
+        "LOG": float,
         "millLOG": int,
     }
 
@@ -80,23 +92,35 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
         how="left",
     )
     merged_df["CODGEO_2024"] = merged_df["NCCENR"]
+
+    # Drop various unused columns
     merged_df = merged_df.drop(
         columns=["COM", "NCCENR", "millPOP", "LOG", "millLOG", "tauxpourmille"],
     )
     merged_df = merged_df.rename(
         columns={"CODGEO_2024": "City", "annee": "Year", "faits": "Cases"},
     )
+
+    # Saves the resulting DataFrame
     merged_df.to_csv(Path("./", "data", "cleaned", file.parts[-1]), index=False)
 
 def clean_osm_data(data: dict[any: any]) -> None:
+    """Clean OpenStreetMap data.
+
+    :param dict[any:any] data: Data retrieved from Overpass Turbo (OSM API)
+    """
     osm_df = DataFrame(data)
     osm_df["tags"] = osm_df["tags"].apply(extract_date)
     osm_df = osm_df.drop(columns=["type", "id"])
     osm_df = osm_df.rename(columns={"lat": "Lat", "lon": "Long-", "tags": "Timestamp"})
-    osm_df.to_csv("./data/cleaned/osm_cleaned.csv", index=False)
+    osm_df.to_csv(Path("./", "data", "cleaned", "osm_cleaned.csv"), index=False)
 
 
-def extract_date(tag: any) -> str:
+def extract_date(tag: any) -> str | None:
+    """Extract date from given OSM metadata.
+
+    :param tag any: Metadata to be analyzed
+    """
     date_keys = ["date", "start"]
     date_pattern = recompile(r"^\d{4}-\d{2}")
     if isinstance(tag, dict):
@@ -118,6 +142,11 @@ def extract_date(tag: any) -> str:
     return None
 
 def clean_shodan_result(shodan_result: dict, *, fallback: bool = False) -> list:
+    """Clean shodan result.
+
+    :param shodan_result dict: Data retrieved from shodan
+    :param fallback bool: Self-explanatory
+    """
     cleaned_results = []
 
     if fallback:

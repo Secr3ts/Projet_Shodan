@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+from json import JSONDecodeError
 from math import ceil
 from os import getenv
 from pathlib import Path
@@ -13,7 +13,7 @@ from shodan import APIError, Shodan
 from src.utils.clean_data import clean_data, clean_osm_data, clean_shodan_result
 from src.utils.utils import (
     cleanup_data,
-    create_directories,
+    setup_directories,
     decompress_gz,
     fallback_to_json,
 )
@@ -23,10 +23,10 @@ def get_data(
     shodan_clients: list[Shodan],
     raw_path: Path = Path("./", "data", "raw"),
 ) -> None:
-    create_directories()
+    setup_directories()
 
     get_osm_data("http://overpass-api.de/api/interpreter")
-    exit()
+
     if "dev" in getenv("ENV"):
         get_shodan_data(shodan_clients)
     v_commune_path: Path = download_data(
@@ -84,7 +84,6 @@ def get_shodan_data(
     start_page: int = 1,
 ) -> None:
     if tries > MAX_TRIES:
-        print("max tries reached, Falling back to the JSON")
         fallback_to_json(clean_shodan_result)
         return
     shodan = shodan_clients[0]
@@ -102,20 +101,16 @@ def get_shodan_data(
                 result = shodan.search("camera country:fr before:2024-01-01", page=i)
 
                 if "matches" not in result:
-                    print("No matches. Falling back to the JSON")
                     fallback_to_json(clean_shodan_result)
                     break
 
                 cleaned_data.extend(clean_shodan_result(result))
             except APIError as e:
-                print(f"APIError: {e}")
                 if "query credits" in str(e).lower():
                     if len(shodan_clients) > 1:
                         shodan_clients.pop(0)
-                        print("Switching to next API key")
                         get_shodan_data(shodan_clients, tries, start_page=i)
                         return
-                    print("No more API keys available")
                     fallback_to_json(clean_shodan_result)
                     return
 
@@ -127,7 +122,6 @@ def get_shodan_data(
             header=False,
         )
     except APIError as e:
-        print(e)
         get_shodan_data(shodan_clients, tries + 1, start_page)
 
 
@@ -150,9 +144,9 @@ def get_osm_data(endpoint_url: str) -> None:
         els = data.get("elements", [])
 
         clean_osm_data(els)
-    except RequestException as e:
-        print("Request error: " + str(e))
-    except json.JSONDecodeError as e:
-        print("JSON decode error: " + str(e))
+    except RequestException:
+        pass
+    except JSONDecodeError:
+        pass
 
 
