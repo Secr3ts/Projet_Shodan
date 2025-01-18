@@ -277,7 +277,7 @@ def clean_osm_data(data: dict[any: any]) -> None:
     osm_df = DataFrame(data)
     osm_df["tags"] = osm_df["tags"].apply(extract_date)
     osm_df = osm_df.drop(columns=["type", "id"])
-    osm_df = osm_df.rename(columns={"lat": "Lat", "lon": "Lon", "tags": "Timestamp"})
+    osm_df = osm_df.rename(columns={"lat": "Lat", "lon": "Long", "tags": "Timestamp"})
     osm_df.to_csv("./data/cleaned/osm_cleaned.csv", index=False)
 
 
