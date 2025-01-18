@@ -15,27 +15,36 @@ def create_layout():
 
     years = sorted(crime_data["Year"].unique())
 
-    crime_summary = crime_data[crime_data["Year"] == years[0]].groupby(["City"])["Cases"].mean().reset_index()  # noqa: E501
+    crime_summary = crime_data[crime_data["Year"] == years[0]].groupby(["City"])[["Cases", "POP"]].mean().reset_index()  # noqa: E501
+    crime_summary["Crime_Rate"] = (crime_summary["Cases"] / crime_summary["POP"]) * 100
     geo_data = geo_data.merge(
         crime_summary,
         how="left",
         left_on="libgeo",
         right_on="City",
     )
+    geo_data["Crime_Rate"] = geo_data["Crime_Rate"].fillna(0)
     geo_data["Cases"] = geo_data["Cases"].fillna(0)
+    geo_data["POP"] = geo_data["POP"].fillna(0)
 
-    min_value = geo_data["Cases"].quantile(0.1)
-    max_value = geo_data["Cases"].quantile(0.9)
+    min_value = geo_data["Crime_Rate"].quantile(0.1)
+    max_value = geo_data["Crime_Rate"].quantile(0.9)
 
     map_fig_crime = px.choropleth_mapbox(
         geo_data,
         geojson=geo_data.geometry,
         locations=geo_data.index,
-        color="Cases",
+        color="Crime_Rate",
         color_continuous_scale=["#00ff00", "#ffff00", "#ff0000"],
         range_color=(min_value, max_value),
         hover_name="libgeo",
-        hover_data={"Cases": True, "City": False},
+        hover_data={"Crime_Rate": ":.3f","Cases": True,"POP": True,"dep": True},
+        labels={
+            "Crime_Rate": "Taux de criminalité (%)",
+            "Cases": "Nombre de cas",
+            "POP": "Population",
+            "dep": "Département",
+        },
         mapbox_style="open-street-map",
         zoom=5,
         center={"lat": 46.603354, "lon": 1.888334},
@@ -43,7 +52,7 @@ def create_layout():
     ).update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0}, uirevision=True)
 
     camera_data = []
-    with open("data/backup/raw/shodan_camera_fr.json", "r") as f:
+    with open("data/backup/raw/shodan_camera_fr.json") as f:
         for line in f:
             camera_data.append(json.loads(line.strip()))
 
@@ -55,6 +64,11 @@ def create_layout():
                 "Longitude": camera.get("location", {}).get("longitude"),
                 "IP": camera.get("ip_str", "Unknown"),
                 "Organization": camera.get("org", "Unknown"),
+                "Product": camera.get("product", "Unknown"),
+                "OS": camera.get("os", "Unknown"),
+                "Port": camera.get("port", "Unknown"),
+                "Hostname": camera.get("hostnames", [])[0] if camera.get("hostnames", []) else "Unknown",  # noqa: E501
+                "Last_Update": camera.get("timestamp", "Unknown"),
             }
             for camera in camera_data
         ],
@@ -65,7 +79,15 @@ def create_layout():
         lat="Latitude",
         lon="Longitude",
         hover_name="City",
-        hover_data=["IP", "Organization"],
+        hover_data={
+            "IP": True,
+            "Organization": True,
+            "Product": True,
+            "OS": True,
+            "Port": True,
+            "Hostname": True,
+            "Last_Update": True
+        },
         mapbox_style="open-street-map",
         zoom=5,
         center={"lat": 46.603354, "lon": 1.888334},
@@ -84,19 +106,34 @@ def create_layout():
                 children=[
                     html.Div(
                         children=[
-                            html.Label("Informations. (WIP)"),
+                            html.Label("Informations", className="text-xl font-bold mb-4"),  # noqa: E501
+                            html.Div(
+                                id="click-data",
+                                className="text-lg",
+                                children="Cliquez sur une zone pour voir les détails",
+                            ),
                         ],
-                        className="gradient-content rounded",
+                        className="gradient-content rounded p-4",
                     ),
                 ],
                 className="gradient-box row-start-2 row-end-13 col-start-1 col-end-3 rounded-md z-1",
             ),
             dcc.RadioItems(
-                id='year-radio',
+                id="year-radio",
                 options=[{"label": str(year), "value": year} for year in years],
                 value=years[0],
                 inline=True,
-                className="row-start-2 row-end-3 col-start-3 col-end-7 z-1 flex items-center gap-2",
+                className="row-start-2 row-end-3 col-start-3 col-end-5 z-1 flex items-center gap-2",  # noqa: E501
+            ),
+            dcc.RadioItems(
+                id="view-type-radio",
+                options=[
+                    {"label": "Par Communes", "value": "communes"},
+                    {"label": "Par Départements", "value": "departements"}
+                ],
+                value="communes",
+                inline=True,
+                className="row-start-2 row-end-3 col-start-5 col-end-7 z-1 flex items-center gap-2",  # noqa: E501
             ),
             html.Div(
                 children=[
@@ -106,12 +143,12 @@ def create_layout():
                         children=dcc.Graph(
                             id="france-map-crime",
                             figure=map_fig_crime,
-                            className="w-full h-full rounded-md shadow-md overflow-hidden z-1",
+                            className="w-full h-full rounded-md shadow-md overflow-hidden z-1",  # noqa: E501
                         ),
                         className="w-full h-full",
                     ),
                 ],
-                className="map-container row-start-3 row-end-8 col-start-3 col-end-7 flex items-center justify-center",
+                className="map-container row-start-3 row-end-8 col-start-3 col-end-7 flex items-center justify-center",  # noqa: E501
             ),
             html.Div(
                 children=[
@@ -121,12 +158,12 @@ def create_layout():
                         children=dcc.Graph(
                             id="france-map-camera",
                             figure=map_fig_camera,
-                            className="h-full w-full rounded-md shadow-md overflow-hidden z-1",
+                            className="h-full w-full rounded-md shadow-md overflow-hidden z-1",  # noqa: E501
                         ),
                         className="h-full w-full",
                     ),
                 ],
-                className="map-container row-start-8 row-end-13 col-start-3 col-end-7 flex items-center justify-center",
+                className="map-container row-start-8 row-end-13 col-start-3 col-end-7 flex items-center justify-center",  # noqa: E501
             ),
             html.Div(
                 children=[
