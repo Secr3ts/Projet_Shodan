@@ -1,4 +1,4 @@
-import sys
+"""Main file."""
 from os import environ
 
 from dash import Dash, html
@@ -11,21 +11,20 @@ from src.utils.get_data import get_data
 def main() -> None:
     shodan_clients = initialize_shodan()
     get_data(shodan_clients)
-    # launchApp(shodan_clients[0])
 
 
 class ShodanInitializationError(Exception):
-    pass
+    """Dummy class for errors."""
 
 
 def initialize_shodan() -> list[Shodan]:
     load_dotenv()
-    keys = environ.get("SHODAN_API_KEY")
-    if not keys:
+    raw_keys = environ.get("SHODAN_API_KEY")
+    if not raw_keys:
         error_msg = "Verify the .env file."
         raise ShodanInitializationError(Exception(error_msg))
 
-    keys = keys.split(",")
+    keys = raw_keys.split(",")
     return [Shodan(key) for key in keys]
 
 def launch_app() -> None:

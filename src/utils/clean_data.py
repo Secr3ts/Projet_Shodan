@@ -4,6 +4,7 @@ from __future__ import annotations
 from json import JSONDecodeError, loads
 from pathlib import Path
 from re import compile as recompile
+from typing import Any
 
 from pandas import DataFrame, read_csv, to_numeric
 
@@ -63,9 +64,10 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
         "millLOG": int,
     }
 
-    for col, dtype in numeric_cols.items():
+    for col, col_dtype in numeric_cols.items():
         if col in crimes_df.columns:
-            crimes_df[col] = to_numeric(crimes_df[col], errors="coerce").astype(dtype)
+            crimes_df[col] = to_numeric(crimes_df[col], errors="coerce").astype(
+                col_dtype)
 
     ndiff_mask = crimes_df["valeur.publiée"] == "ndiff"
     crimes_df.loc[ndiff_mask, "faits"] = crimes_df.loc[ndiff_mask, "complementinfoval"]
@@ -104,7 +106,7 @@ def clean_csv_data(file: Path, french_cities: Path) -> None:
     # Saves the resulting DataFrame
     merged_df.to_csv(Path("./", "data", "cleaned", file.parts[-1]), index=False)
 
-def clean_osm_data(data: dict[any: any]) -> None:
+def clean_osm_data(data: dict[Any, Any]) -> None:
     """Clean OpenStreetMap data.
 
     :param dict[any:any] data: Data retrieved from Overpass Turbo (OSM API)
@@ -116,7 +118,7 @@ def clean_osm_data(data: dict[any: any]) -> None:
     osm_df.to_csv(Path("./", "data", "cleaned", "osm_cleaned.csv"), index=False)
 
 
-def extract_date(tag: any) -> str | None:
+def extract_date(tag: dict | str = "") -> str | None:
     """Extract date from given OSM metadata.
 
     :param tag any: Metadata to be analyzed

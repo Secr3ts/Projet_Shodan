@@ -2,6 +2,7 @@
 from gzip import decompress
 from json import JSONDecodeError, loads
 from pathlib import Path
+from typing import Callable
 
 from pandas import DataFrame
 
@@ -56,7 +57,7 @@ def cleanup_data(directory: Path) -> None:
         if file.is_file():
             file.unlink()
 
-def fallback_to_json(callback: callable) -> None:
+def fallback_to_json(callback: Callable) -> None:
     """Fallback to the Shodan JSON in case of API Outage for example.
 
     :param callback callable: callback for data cleaning

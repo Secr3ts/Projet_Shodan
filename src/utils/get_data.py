@@ -1,8 +1,8 @@
+"""Get data from various sources then cleans them and feeds them to the dashboard."""
 from __future__ import annotations
 
 from json import JSONDecodeError
 from math import ceil
-from os import getenv
 from pathlib import Path
 from typing import Callable
 
@@ -13,9 +13,9 @@ from shodan import APIError, Shodan
 from src.utils.clean_data import clean_data, clean_osm_data, clean_shodan_result
 from src.utils.utils import (
     cleanup_data,
-    setup_directories,
     decompress_gz,
     fallback_to_json,
+    setup_directories,
 )
 
 
@@ -23,12 +23,17 @@ def get_data(
     shodan_clients: list[Shodan],
     raw_path: Path = Path("./", "data", "raw"),
 ) -> None:
+    """Set the working space, get data and clean them.
+
+    :param shodan_clients list[Shodan]: List of shodan clients (one api key per client)
+    :param raw_path Path: path to save the dirty files to
+    """
     setup_directories()
 
     get_osm_data("http://overpass-api.de/api/interpreter")
 
-    if "dev" in getenv("ENV"):
-        get_shodan_data(shodan_clients)
+
+    get_shodan_data(shodan_clients)
     v_commune_path: Path = download_data(
         "https://www.insee.fr/fr/statistiques/fichier/7766585/v_commune_2024.csv",
         raw_path / "v_commune_2024.csv",
@@ -55,16 +60,22 @@ def download_data(
     alternate_url: str | None = None,
     callback: Callable | None = None,
 ) -> Path:
+    """Download data.
+
+    :param url str: the url to download data from
+    :param save_path Path: the files will be saved at this location
+    :param alternate_url str: only used if url isn't reachable
+    :param callback Callable | None: gets called after downloading
+    """
     try:
         check = head(url)
-        with get(url if check.ok else alternate_url, stream=True) as r:
+        with get(url if check.ok else alternate_url or "", stream=True) as r:
             r.raise_for_status()
             with save_path.open(mode="wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
             if callback:
                 return callback(save_path)
-            return save_path
     except (RequestException, APIError) as e:
         print(e)
         # fallback to /data/backup/
@@ -72,6 +83,8 @@ def download_data(
         if backup_path.exists():
             return backup_path
         print(f"Backup file {backup_path} not found.")
+
+    return save_path
 
 
 MAX_TRIES = 0
@@ -83,6 +96,12 @@ def get_shodan_data(
     tries: int = 1,
     start_page: int = 1,
 ) -> None:
+    """Try to get data from shodan API. If failing, fallbacks to the JSON.
+
+    :param shodan_clients list[Shodan]: clients to be used to get data
+    :param tries int: number of current try
+    :param start_page int: will try to get data from this page on
+    """
     if tries > MAX_TRIES:
         fallback_to_json(clean_shodan_result)
         return
@@ -121,11 +140,15 @@ def get_shodan_data(
             mode="a",
             header=False,
         )
-    except APIError as e:
+    except APIError:
         get_shodan_data(shodan_clients, tries + 1, start_page)
 
 
 def get_osm_data(endpoint_url: str) -> None:
+    """Get data from OpenStreetMap.
+
+    :param endpoint_url str: API url to get data from
+    """
     query = """
     [out:json];
     (
