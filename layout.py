@@ -51,28 +51,7 @@ def create_layout():
         opacity=0.6,
     ).update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0}, uirevision=True)
 
-    camera_data = []
-    with open("data/backup/raw/shodan_camera_fr.json") as f:
-        for line in f:
-            camera_data.append(json.loads(line.strip()))
-
-    camera_locations = pd.DataFrame(
-        [
-            {
-                "City": camera.get("location", {}).get("city", "Unknown"),
-                "Latitude": camera.get("location", {}).get("latitude"),
-                "Longitude": camera.get("location", {}).get("longitude"),
-                "IP": camera.get("ip_str", "Unknown"),
-                "Organization": camera.get("org", "Unknown"),
-                "Product": camera.get("product", "Unknown"),
-                "OS": camera.get("os", "Unknown"),
-                "Port": camera.get("port", "Unknown"),
-                "Hostname": camera.get("hostnames", [])[0] if camera.get("hostnames", []) else "Unknown",  # noqa: E501
-                "Last_Update": camera.get("timestamp", "Unknown"),
-            }
-            for camera in camera_data
-        ],
-    )
+    camera_locations = pd.read_csv("data/cleaned/shodan_camera_fr.csv")
 
     map_fig_camera = px.scatter_mapbox(
         camera_locations,
@@ -81,17 +60,16 @@ def create_layout():
         hover_name="City",
         hover_data={
             "IP": True,
-            "Organization": True,
-            "Product": True,
-            "OS": True,
-            "Port": True,
-            "Hostname": True,
-            "Last_Update": True
+            "Org": True,
+            "Region": True,
+            "Timestamp": True,
+            "Domains": True
         },
         mapbox_style="open-street-map",
         zoom=5,
         center={"lat": 46.603354, "lon": 1.888334},
         opacity=0.8,
+        color_discrete_sequence=["blue"],
     )
     map_fig_camera.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
 
