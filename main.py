@@ -5,8 +5,8 @@ from dash import Dash
 from dotenv import load_dotenv
 from shodan import Shodan
 
-from callback import register_callbacks
-from layout import create_layout
+from src.pages.map_page.callbacks import register_callbacks
+from src.pages.map_page.layout import create_layout
 from src.utils.get_data import get_data
 
 

@@ -1,0 +1,1 @@
+"""Init map page module."""

@@ -17,10 +17,8 @@ REGION_CODES = {
     "75": "NAQ",  # Nouvelle-Aquitaine
     "76": "OCC",  # Occitanie
     "52": "PDL",  # Pays de la Loire
-    "93": "PAC",   # Provence-Alpes-Côte d'Azur
+    "93": "PAC",  # Provence-Alpes-Côte d'Azur
 }
-
-DOM_DEPARTMENTS = ["971", "972", "973", "974", "976"]
 
 
 def load_data(selected_year: int):  # noqa: ANN201
