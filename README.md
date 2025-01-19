@@ -1,5 +1,3 @@
-# Project CRIME/CAMERAS
-
 This project serves as a proof-of-concept of correlating crime rates with the number of cameras throughout France. Specifically aimed at 2016-2023 due to a lack of data before and after this period.
 
 ### Table of Contents
@@ -122,3 +120,5 @@ However, everything needs to be taken with a grain of salt, as the data we have 
 ## Copyright
 
 We certify and swear on our honor that each line of code that has been borrowed is credited to its rightful owner and everything else is solely ours. All resemblance with an existing project/file is purely coincidental.
+=======
+# Projet Camera/Crimes
