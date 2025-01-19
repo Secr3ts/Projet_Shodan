@@ -31,7 +31,7 @@ This project works with `Python 3.11.x`.
 For maximum compatibility, please use [`Python 3.11`](https://www.python.org/downloads/release/python-3119/).
 
 ### Running
-To run the dashboard, just type `python main.py` and visit [this](http://localhost:leportenquestion) page.
+To run the dashboard, cd into the Projet_Shodan directory and type `python main.py`. Then visit [this](http://localhost:8050) page.
 
 ## Data
 
