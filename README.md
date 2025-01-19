@@ -81,28 +81,38 @@ Callbacks handle the interactivity of the dashboard:
 Below is a diagram that explains the relations between different files of our codebase.
 ```mermaid
 graph TD
-    A[main.py] -->|calls| B[initializeShodan]
-    A -->|calls| C[launchApp]
-    B -->|loads| D[.env]
-    C -->|uses| E[Dash]
-    C -->|uses| F[Shodan]
-    C -->|uses| G[html]
-    C -->|uses| H[dcc]
-    C -->|uses| I[launchApp]
-    C -->|uses| J[app.layout]
-    C -->|uses| K[app.run_server]
+    A[main.py] -->|calls| B[initialize_shodan]
+    A -->|calls| C[launch_app]
+    A -->|calls| D[get_data]
+    B -->|loads| E[.env]
+    D -->|calls| F[setup_directories]
+    D -->|calls| G[clean_csv_data]
+    D -->|calls| H[clean_osm_data]
+    D -->|calls| I[clean_shodan_result]
+    D -->|calls| J[download_data]
+    D -->|calls| K[decompress_gz]
+    D -->|calls| L[move_geojson_file]
+    D -->|calls| M[cleanup_data]
+    D -->|calls| N[fallback_to_json]
+    C -->|uses| O[Dash]
+    C -->|uses| P[html]
+    C -->|uses| Q[dcc]
+    C -->|calls| R[create_layout]
+    C -->|calls| S[register_callbacks]
     subgraph utils
-        L[clean_data.py]
-        M[utils.py]
-        N[shared.py]
+        F[setup_directories]
+        G[clean_csv_data]
+        H[clean_osm_data]
+        I[clean_shodan_result]
+        J[download_data]
+        K[decompress_gz]
+        L[move_geojson_file]
+        M[cleanup_data]
+        N[fallback_to_json]
     end
-    L -->|imports| N
-    M -->|imports| N
-    A -->|imports| L
-    A -->|imports| M
-    A -->|imports| N
     subgraph components
-        O[__init__.py]
+        S[register_callbacks]
+        R[create_layout]
     end
 ```
 

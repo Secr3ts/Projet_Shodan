@@ -4,3 +4,6 @@ data/cleaned/
 data/raw/
 data/
 .DS_STORE
+src/utils/__pycache__/
+.mypy_cache/
+.ruff_cache/
