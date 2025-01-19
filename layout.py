@@ -55,22 +55,35 @@ def create_layout():
 
     total_population = crime_data[crime_data['Year'] == 2023]['POP'].sum()
 
-    camera_locations = pd.read_csv("data/cleaned/shodan_camera_fr.csv")
+    camera_locations = pd.read_csv("data/cleaned/osm_cleaned.csv", names=['Lat', 'Long-', 'Timestamp'])
+    camera_locations['Timestamp'] = pd.to_datetime(camera_locations['Timestamp'], errors='coerce')
+    camera_locations = camera_locations.dropna(subset=['Lat', 'Long-'])
     total_cameras = len(camera_locations)
 
-    camera_coverage = round((total_cameras * 100000) / total_population, 2)
+    try:
+        import reverse_geocoder as rg
+
+        coordinates = camera_locations[['Lat', 'Long-']].values.tolist()
+        result = rg.search(coordinates)
+
+        regions = [entry['admin1'] for entry in result]
+        region_counts = pd.Series(regions).value_counts()
+
+        most_cameras_region = region_counts.index[0] if len(region_counts) > 0 else "Non disponible"
+        most_cameras_count = region_counts.iloc[0] if len(region_counts) > 0 else 0
+    except Exception as e:
+        print(f"Erreur de géolocalisation : {e}")
+        most_cameras_region = "Non disponible"
+        most_cameras_count = 0
 
     map_fig_camera = px.scatter_mapbox(
         camera_locations,
-        lat="Latitude",
-        lon="Longitude",
-        hover_name="City",
+        lat="Lat",
+        lon="Long-",
+        hover_name="Timestamp",
         hover_data={
-            "IP": True,
-            "Org": True,
-            "Region": True,
-            "Timestamp": True,
-            "Domains": True
+            "Lat": ":.4f",
+            "Long-": ":.4f",
         },
         mapbox_style="open-street-map",
         zoom=5,
@@ -80,9 +93,10 @@ def create_layout():
     )
     map_fig_camera.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
 
-    region_camera_counts = camera_locations['Region'].value_counts()
-    most_cameras_region = region_camera_counts.index[0]
-    most_cameras_count = region_camera_counts.iloc[0]
+    try:
+        camera_coverage = round((total_cameras * 100000) / total_population, 2)
+    except Exception:
+        camera_coverage = 0
 
     return html.Div(
         className="grid grid-rows-[50px_600px_50px_600px_600px_600px] gap-4 grid-cols-5 relative overflow-hidden p-4",
