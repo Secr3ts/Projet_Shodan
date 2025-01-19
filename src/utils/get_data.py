@@ -1,4 +1,5 @@
 """Get data from various sources then cleans them and feeds them to the dashboard."""
+
 from __future__ import annotations
 
 from json import JSONDecodeError
@@ -32,7 +33,6 @@ def get_data(
 
     get_osm_data("http://overpass-api.de/api/interpreter")
 
-
     get_shodan_data(shodan_clients)
     v_commune_path: Path = download_data(
         "https://www.insee.fr/fr/statistiques/fichier/7766585/v_commune_2024.csv",
@@ -53,6 +53,7 @@ def get_data(
     for file in files_raw:
         clean_data(file, v_commune_path)
     cleanup_data(Path("./", "data", "raw"))
+
 
 def download_data(
     url: str,
@@ -151,9 +152,17 @@ def get_osm_data(endpoint_url: str) -> None:
     """
     query = """
     [out:json];
+    area[name="France"]->.searchArea;
+
+    // Search for nodes, ways, or relations with camera-related tags
     (
-      node["man_made"="surveillance"](48.815573, 2.224199, 51.124199, 5.142222);
+      node["man_made"="surveillance"](area.searchArea);
+      node["surveillance"](area.searchArea);
+      way["man_made"="surveillance"](area.searchArea);
+      way["surveillance"](area.searchArea);
     );
+
+    // Output the results
     out body;
     >;
     out skel qt;
@@ -167,9 +176,8 @@ def get_osm_data(endpoint_url: str) -> None:
         els = data.get("elements", [])
 
         clean_osm_data(els)
+        exit()
     except RequestException:
         pass
     except JSONDecodeError:
         pass
-
-
