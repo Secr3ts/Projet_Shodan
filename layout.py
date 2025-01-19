@@ -53,34 +53,34 @@ def create_layout():
 
     crime_data = pd.read_csv("data/cleaned/crimes_france_2.csv")
 
-    total_population = crime_data[crime_data['Year'] == 2023]['POP'].sum()
+    total_population = 68170000
 
-    camera_locations = pd.read_csv("data/cleaned/osm_cleaned.csv", names=['Lat', 'Long-', 'Timestamp'])
-    camera_locations['Timestamp'] = pd.to_datetime(camera_locations['Timestamp'], errors='coerce')
-    camera_locations = camera_locations.dropna(subset=['Lat', 'Long-'])
+    camera_locations = pd.read_csv("data/cleaned/osm_cleaned.csv", names=["Lat", "Long-", "Timestamp"])
+    camera_locations["Timestamp"] = pd.to_datetime(camera_locations["Timestamp"], errors="coerce")
+    camera_locations = camera_locations.dropna(subset=["Lat", "Long-"])
     total_cameras = len(camera_locations)
 
     try:
         import reverse_geocoder as rg
 
-        coordinates = camera_locations[['Lat', 'Long-']].values.tolist()
+        coordinates = camera_locations[["Lat", "Long-"]].values.tolist()
         result = rg.search(coordinates)
 
-        regions = [entry['admin1'] for entry in result]
+        regions = [entry["admin1"] for entry in result]
         region_counts = pd.Series(regions).value_counts()
 
-        most_cameras_region = region_counts.index[0] if len(region_counts) > 0 else "Non disponible"
+        most_cameras_region = region_counts.index[0] if len(region_counts) > 0 else "Non disponible"  # noqa: E501
         most_cameras_count = region_counts.iloc[0] if len(region_counts) > 0 else 0
     except Exception as e:
         print(f"Erreur de géolocalisation : {e}")
-        most_cameras_region = "Non disponible"
-        most_cameras_count = 0
+
+    camera_locations["hover_name"] = "Camera"
 
     map_fig_camera = px.scatter_mapbox(
         camera_locations,
         lat="Lat",
         lon="Long-",
-        hover_name="Timestamp",
+        hover_name="hover_name",
         hover_data={
             "Lat": ":.4f",
             "Long-": ":.4f",
@@ -99,10 +99,10 @@ def create_layout():
         camera_coverage = 0
 
     return html.Div(
-        className="grid grid-rows-[50px_600px_50px_600px_600px_600px] gap-4 grid-cols-5 relative overflow-hidden p-4",
+        className="grid grid-rows-[50px_600px_50px_600px_600px_600px] gap-4 grid-cols-6 relative overflow-hidden p-4",  # noqa: E501
         children=[
             html.H1(
-                "Carte des Crimes et Caméras en France",
+                "Crimes et Caméras en France",
                 className="text-3xl font-bold text-center col-span-5",
             ),
             html.Div(
@@ -118,7 +118,7 @@ def create_layout():
                         className="w-full h-full flex items-center",
                     ),
                 ],
-                className="map-container row-start-2 row-end-3 col-start-1 col-end-4 flex items-center justify-center bg-white rounded-md overflow-hidden",  # noqa: E501
+                className="map-container row-start-2 row-end-3 col-start-1 col-end-5 flex items-center justify-center bg-white rounded-md overflow-hidden",  # noqa: E501
             ),
             html.Div(
                 children=[
@@ -161,7 +161,7 @@ def create_layout():
                         ]
                     )
                 ],
-                className="row-start-2 row-end-3 col-start-4 col-end-6 bg-white rounded-md shadow-md relative overflow-hidden",  # noqa: E501
+                className="row-start-2 row-end-3 col-start-5 col-end-7 bg-white rounded-md shadow-md relative overflow-hidden",  # noqa: E501
             ),
             dcc.RadioItems(
                 id="view-type-radio",
@@ -172,7 +172,7 @@ def create_layout():
                 ],
                 value="communes",
                 inline=True,
-                className="row-start-3 row-end-4 col-start-4 col-end-6 z-1 flex items-center gap-2",  # noqa: E501
+                className="row-start-3 row-end-4 col-start-3 col-end-5 z-1 flex items-center justify-end gap-2",  # noqa: E501
             ),
             dcc.RadioItems(
                 id="year-radio",
@@ -204,14 +204,6 @@ def create_layout():
                                     html.Div(
                                         className="bg-white/20 p-4 rounded-lg",
                                         children=[
-                                            html.H3("Région la Plus Surveillée", className="text-lg font-semibold mb-2"),  # noqa: E501
-                                            html.P(most_cameras_region, id="most-cameras-region", className="text-3xl font-bold"),  # noqa: E501
-                                            html.P(most_cameras_count, id="most-cameras-count", className="text-sm opacity-75"),  # noqa: E501
-                                        ]
-                                    ),
-                                    html.Div(
-                                        className="bg-white/20 p-4 rounded-lg",
-                                        children=[
                                             html.H3("Taux de Couverture", className="text-lg font-semibold mb-2"),  # noqa: E501
                                             html.P(camera_coverage, id="camera-coverage", className="text-3xl font-bold"),  # noqa: E501
                                             html.P("caméras/100k habitants", className="text-sm opacity-75"),  # noqa: E501
@@ -237,7 +229,37 @@ def create_layout():
                         className="h-full w-full",
                     ),
                 ],
-                className="map-container row-start-4 row-end-5 col-start-3 col-end-6 flex items-center justify-center bg-white rounded-md overflow-hidden",  # noqa: E501
+                className="map-container row-start-4 row-end-5 col-start-3 col-end-7 flex items-center justify-center bg-white rounded-md overflow-hidden",  # noqa: E501
+            ),
+            html.Div(
+                children=[
+                    html.H2("Comparaison Crimes vs Caméras (2016-2023)", className="text-xl font-bold mb-4"),  # noqa: E501
+                    dcc.Graph(
+                        id="comparison-chart",
+                        className="h-[500px]",
+                    )
+                ],
+                className="col-span-6 h-full bg-white rounded-lg shadow-md p-4",
+            ),
+            html.Div(
+                children=[
+                    html.H2("Évolution du nombre de caméras (2016-2023)", className="text-xl font-bold mb-4"),  # noqa: E501
+                    dcc.Graph(
+                        id="camera-evolution-chart",
+                        className="h-[500px]",
+                    )
+                ],
+                className="col-span-3 h-full bg-white rounded-lg shadow-md p-4",
+            ),
+            html.Div(
+                children=[
+                    html.H2("Évolution du nombre de crimes (2016-2023)", className="text-xl font-bold mb-4"),  # noqa: E501
+                    dcc.Graph(
+                        id="crime-evolution-chart",
+                        className="h-[500px]",
+                    )
+                ],
+                className="col-span-3 h-full bg-white rounded-lg shadow-md p-4",
             ),
             html.Div(
                 children=[

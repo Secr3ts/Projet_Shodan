@@ -6,14 +6,15 @@ from dotenv import load_dotenv
 from shodan import Shodan
 
 from callback import register_callbacks
-from get_data import get_data
 from layout import create_layout
 from src.utils.get_data import get_data
 
 
 def main() -> None:
+    """Point d'entrée principal de l'application."""
     shodan_clients = initialize_shodan()
     get_data(shodan_clients)
+    launch_app()
 
 
 class ShodanInitializationError(Exception):
@@ -21,6 +22,7 @@ class ShodanInitializationError(Exception):
 
 
 def initialize_shodan() -> list[Shodan]:
+    """Initialise les clients Shodan."""
     load_dotenv()
     raw_keys = environ.get("SHODAN_API_KEY")
     if not raw_keys:
@@ -30,14 +32,16 @@ def initialize_shodan() -> list[Shodan]:
     keys = raw_keys.split(",")
     return [Shodan(key) for key in keys]
 
-def create_app():
-    external_script = [
+
+def launch_app() -> None:
+    """Lance l'application Dash avec le layout personnalisé."""
+    external_scripts = [
         "https://cdn.tailwindcss.com",
     ]
 
     app = Dash(
         __name__,
-        external_scripts=external_script,
+        external_scripts=external_scripts,
     )
     app.scripts.config.serve_locally = True
 
@@ -45,8 +49,8 @@ def create_app():
 
     register_callbacks(app)
 
-    return app
+    app.run_server(debug=True)
+
 
 if __name__ == "__main__":
-    app = create_app()
-    app.run_server(debug=True)
+    main()

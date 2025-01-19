@@ -1,6 +1,7 @@
 import geopandas as gpd  # noqa: D100
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from dash import Input, Output
 
 REGION_CODES = {
@@ -194,7 +195,7 @@ def register_callbacks(app) -> None:
         worst_region_idx = region_stats["Crime_Rate"].idxmax()
         worst_region = region_stats.loc[worst_region_idx]
 
-        worst_region_code = REGION_CODES.get(str(worst_region["reg"]), str(worst_region["reg"]))
+        worst_region_code = REGION_CODES.get(str(worst_region["reg"]), str(worst_region["reg"]))  # noqa: E501
 
         return (
             f"{total_crimes:,}",
@@ -202,3 +203,158 @@ def register_callbacks(app) -> None:
             worst_region_code,
             f"Taux: {worst_region['Crime_Rate']:.2f}%",
         )
+
+    @app.callback(
+        Output("comparison-chart", "figure"),
+        Input("year-radio", "value"),
+    )
+    def update_comparison_chart(_):
+        # Charger les données de crimes pour toutes les années
+        crime_data = pd.read_csv("data/cleaned/crimes_france_2.csv")
+        yearly_crimes = crime_data.groupby('Year')['Cases'].sum().reset_index()
+        yearly_crimes = yearly_crimes[(yearly_crimes['Year'] >= 2016) & (yearly_crimes['Year'] <= 2023)]
+
+        # Charger et préparer les données de caméras
+        camera_data = pd.read_csv("data/cleaned/osm_cleaned.csv", names=["Lat", "Long-", "Timestamp"])
+        camera_data["Timestamp"] = pd.to_datetime(camera_data["Timestamp"], errors="coerce")
+        camera_data["Year"] = camera_data["Timestamp"].dt.year
+
+        # Compter les caméras sans date
+        no_date_cameras = camera_data["Timestamp"].isna().sum()
+
+        # Préparer les données cumulatives par année
+        yearly_cameras = []
+        for year in range(2016, 2024):
+            # Compter les caméras jusqu'à cette année (incluse)
+            cameras_until_year = camera_data[
+                (camera_data["Year"].notna()) &
+                (camera_data["Year"] <= year)
+            ].shape[0]
+
+            # Ajouter les caméras sans date à chaque année
+            total_cameras = cameras_until_year + no_date_cameras
+
+            yearly_cameras.append({
+                "Year": year,
+                "Cameras": total_cameras,
+            })
+
+        yearly_cameras = pd.DataFrame(yearly_cameras)
+
+        merged_data = pd.merge(yearly_crimes, yearly_cameras, on="Year")
+        merged_data["Crimes_per_100_Cameras"] = (merged_data["Cases"] / merged_data["Cameras"]) * 100  # noqa: E501
+
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=merged_data["Year"],
+            y=merged_data["Crimes_per_100_Cameras"],
+            name="Crimes pour 100 caméras",
+            line={"color": "purple", "width": 2},
+            mode="lines+markers",
+        ))
+
+        # Mise en page
+        fig.update_layout(
+            title="Évolution du nombre de crimes pour 100 caméras en France",
+            xaxis_title="Année",
+            yaxis_title="Nombre de crimes pour 100 caméras",
+            template="plotly_white",
+            hovermode="x unified",
+        )
+
+        return fig
+
+    @app.callback(
+        Output("camera-evolution-chart", "figure"),
+        [Input("year-radio", "value")],
+    )
+    def update_camera_evolution(_):
+        try:
+            camera_data = pd.read_csv("data/cleaned/osm_cleaned.csv", names=["Lat", "Long-", "Timestamp"])  # noqa: E501
+            camera_data["Timestamp"] = pd.to_datetime(camera_data["Timestamp"], errors="coerce")  # noqa: E501
+            camera_data["Year"] = camera_data["Timestamp"].dt.year
+
+            no_date_cameras = camera_data["Timestamp"].isna().sum()
+
+            yearly_cameras = []
+            for year in range(2016, 2024):
+                cameras_until_year = camera_data[
+                    (camera_data["Year"].notna()) &
+                    (camera_data["Year"] <= year)
+                ].shape[0]
+
+                total_cameras = cameras_until_year + no_date_cameras
+
+                yearly_cameras.append({
+                    "Year": year,
+                    "Cameras": total_cameras,
+                })
+
+            yearly_cameras = pd.DataFrame(yearly_cameras)
+
+            fig = px.bar(
+                yearly_cameras,
+                x="Year",
+                y="Cameras",
+                title="Évolution du nombre de caméras en France",
+                labels={"Cameras": "Nombre de caméras", "Year": "Année"},
+                color_discrete_sequence=["#00CC96"],
+            )
+
+            fig.update_layout(
+                xaxis_tickangle=-45,
+                showlegend=False,
+                margin={"r": 20, "t": 40, "l": 20, "b": 20},
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+            )
+
+            fig.update_traces(
+                marker_line_color="#009973",
+                marker_line_width=1.5,
+                opacity=0.8,
+            )
+
+            return fig
+        except Exception as e:
+            print(f"Error in update_camera_evolution: {e}")
+            return {}
+
+    @app.callback(
+        Output("crime-evolution-chart", "figure"),
+        [Input("year-radio", "value")],
+    )
+    def update_crime_evolution(_):
+        try:
+            crime_data = pd.read_csv("data/cleaned/crimes_france_2.csv")
+            yearly_crimes = crime_data.groupby("Year")["Cases"].sum().reset_index()
+            yearly_crimes = yearly_crimes[yearly_crimes["Year"].between(2016, 2023)]
+
+            fig = px.bar(
+                yearly_crimes,
+                x="Year",
+                y="Cases",
+                title="Évolution du nombre de crimes en France",
+                labels={"Cases": "Nombre de crimes", "Year": "Année"},
+                color_discrete_sequence=["#FF6B6B"],
+            )
+
+            fig.update_layout(
+                xaxis_tickangle=-45,
+                showlegend=False,
+                margin={"r": 20, "t": 40, "l": 20, "b": 20},
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)"
+            )
+
+            fig.update_traces(
+                marker_line_color="#CC5555",
+                marker_line_width=1.5,
+                opacity=0.8,
+            )
+
+            return fig
+        except Exception as e:
+            print(f"Error in update_crime_evolution: {e}")
+            return {}
