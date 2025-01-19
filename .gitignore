@@ -1,0 +1,7 @@
+.vscode/
+.env
+__pycache__/
+data/cleaned/
+data/raw/
+data/
+.DS_STORE
