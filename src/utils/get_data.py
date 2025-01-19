@@ -176,7 +176,6 @@ def get_osm_data(endpoint_url: str) -> None:
         els = data.get("elements", [])
 
         clean_osm_data(els)
-        exit()
     except RequestException:
         pass
     except JSONDecodeError:
