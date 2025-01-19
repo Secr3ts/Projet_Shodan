@@ -43,7 +43,16 @@ The data used in this project comes from:
 - [Overpass Turbo](https://overpass-turbo.eu/) (secondary source for publicly available cameras)
 
 ### Usage
-aaaa
+Les données sont utilisées de la manière suivante :
+
+- **INSEE** : The boundaries of French municipalities are used to create the base choropleth map. Each municipality is represented by a polygon with its geographical coordinates.
+
+- **GOUV.fr** : Crime rates are cleaned and normalized to be displayed on the map. The data is aggregated by municipality and year, enabling a temporal visualization of crime trends.
+
+- **Shodan** : Camera data is geolocated and filtered to include only public cameras in France. These points are overlaid on the map of municipalities.
+
+- **Overpass Turbo** : A complementary source for surveillance cameras, used to validate and enrich Shodan data.
+
 
 ## Developer Guide
 The code is structured in two main parts:
@@ -52,7 +61,24 @@ The code is structured in two main parts:
 
 Putting it simply, the program first calls `get_data` located in `get_data.py` to fetch all the data, then `get_data` calls the cleansing functions of each data retrieved and moves them to the cleaned folder.
 
-## __!!partie a thibault!!__
+## Dashboard Functionality
+The dashboard is built around two main concepts: Layout and Callbacks.
+
+### Layout
+The layout defines the visual structure of the dashboard using a component-based approach:
+- The page is divided into sections using a modern CSS grid.
+- Each chart (map, histograms, etc.) is encapsulated in a dcc.Graph component.
+- User controls (sliders, dropdowns) are integrated to enable interactivity.
+- User controls (sliders, dropdowns) are integrated to enable interactivity.
+
+### Callbacks
+Callbacks handle the interactivity of the dashboard:
+- Callbacks handle the interactivity of the dashboard:
+- Example: When a user selects a year, the callbacks update:
+  - The map with crime data for the selected year.
+  - The map with crime data for the selected year.
+  - The map with crime data for the selected year.
+- Data is dynamically filtered and transformed based on the selections.
 
 Below is a diagram that explains the relations between different files of our codebase.
 ```mermaid
