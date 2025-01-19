@@ -1,10 +1,16 @@
+"""The module contains the layout configuration for the map page of the dashboard.
+
+It provides functions to create and manage the visual layout of the geographic
+data visualization, including crime statistics across French communes.
+"""
+
 import geopandas as gpd
 import pandas as pd
 import plotly.express as px
 from dash import dcc, html
 
 
-def create_layout():
+def create_layout() -> html.Div:
     geojson_file = "data/cleaned/french_communes.geojson"
     geo_data = gpd.read_file(geojson_file)
 
@@ -53,24 +59,10 @@ def create_layout():
 
     total_population = 68170000
 
-    camera_locations = pd.read_csv("data/cleaned/osm_cleaned.csv", names=["Lat", "Long-", "Timestamp"])
-    camera_locations["Timestamp"] = pd.to_datetime(camera_locations["Timestamp"], errors="coerce")
+    camera_locations = pd.read_csv("data/cleaned/osm_cleaned.csv", names=["Lat", "Long-", "Timestamp"])  # noqa: E501
+    camera_locations["Timestamp"] = pd.to_datetime(camera_locations["Timestamp"], errors="coerce")  # noqa: E501
     camera_locations = camera_locations.dropna(subset=["Lat", "Long-"])
     total_cameras = len(camera_locations)
-
-    try:
-        import reverse_geocoder as rg
-
-        coordinates = camera_locations[["Lat", "Long-"]].values.tolist()
-        result = rg.search(coordinates)
-
-        regions = [entry["admin1"] for entry in result]
-        region_counts = pd.Series(regions).value_counts()
-
-        most_cameras_region = region_counts.index[0] if len(region_counts) > 0 else "Non disponible"  # noqa: E501
-        most_cameras_count = region_counts.iloc[0] if len(region_counts) > 0 else 0
-    except Exception as e:
-        print(f"Erreur de géolocalisation : {e}")
 
     camera_locations["hover_name"] = "Camera"
 
@@ -93,7 +85,9 @@ def create_layout():
 
     try:
         camera_coverage = round((total_cameras * 100000) / total_population, 2)
-    except Exception:
+    except ZeroDivisionError:
+        camera_coverage = 0
+    except (TypeError, ValueError):
         camera_coverage = 0
 
     return html.Div(
@@ -136,7 +130,7 @@ def create_layout():
                                             html.H3("Total des Crimes", className="text-lg font-semibold mb-2"),  # noqa: E501
                                             html.P(id="total-crimes", className="text-3xl font-bold"),  # noqa: E501
                                             html.P("en France", className="text-sm opacity-75"),  # noqa: E501
-                                        ]
+                                        ],
                                     ),
                                     html.Div(
                                         className="bg-white/20 p-4 rounded-lg",
@@ -144,7 +138,7 @@ def create_layout():
                                             html.H3("Taux Moyen", className="text-lg font-semibold mb-2"),  # noqa: E501
                                             html.P(id="avg-crime-rate", className="text-3xl font-bold"),  # noqa: E501
                                             html.P("pour 100 habitants", className="text-sm opacity-75"),  # noqa: E501
-                                        ]
+                                        ],
                                     ),
                                     html.Div(
                                         className="bg-white/20 p-4 rounded-lg",
@@ -152,12 +146,12 @@ def create_layout():
                                             html.H3("Région la Plus Touchée", className="text-lg font-semibold mb-2"),  # noqa: E501
                                             html.P(id="worst-region", className="text-3xl font-bold"),  # noqa: E501
                                             html.P(id="worst-region-rate", className="text-sm opacity-75"),  # noqa: E501
-                                        ]
-                                    )
-                                ]
-                            )
-                        ]
-                    )
+                                        ],
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
                 ],
                 className="row-start-2 row-end-3 col-start-5 col-end-7 bg-white rounded-md shadow-md relative overflow-hidden",  # noqa: E501
             ),
@@ -166,7 +160,7 @@ def create_layout():
                 options=[
                     {"label": "Communes", "value": "communes"},
                     {"label": "Départements", "value": "departements"},
-                    {"label": "Régions", "value": "regions"}
+                    {"label": "Régions", "value": "regions"},
                 ],
                 value="communes",
                 inline=True,
@@ -197,7 +191,7 @@ def create_layout():
                                             html.H3("Total Caméras", className="text-lg font-semibold mb-2"),  # noqa: E501
                                             html.P(total_cameras, id="total-cameras", className="text-3xl font-bold"),  # noqa: E501
                                             html.P("en France", className="text-sm opacity-75"),  # noqa: E501
-                                        ]
+                                        ],
                                     ),
                                     html.Div(
                                         className="bg-white/20 p-4 rounded-lg",
@@ -235,7 +229,7 @@ def create_layout():
                     dcc.Graph(
                         id="comparison-chart",
                         className="h-[500px]",
-                    )
+                    ),
                 ],
                 className="col-span-6 h-full bg-white rounded-lg shadow-md p-4",
             ),
@@ -245,7 +239,7 @@ def create_layout():
                     dcc.Graph(
                         id="camera-evolution-chart",
                         className="h-[500px]",
-                    )
+                    ),
                 ],
                 className="col-span-3 h-full bg-white rounded-lg shadow-md p-4",
             ),
@@ -255,7 +249,7 @@ def create_layout():
                     dcc.Graph(
                         id="crime-evolution-chart",
                         className="h-[500px]",
-                    )
+                    ),
                 ],
                 className="col-span-3 h-full bg-white rounded-lg shadow-md p-4",
             ),
