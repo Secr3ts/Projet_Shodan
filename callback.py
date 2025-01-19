@@ -16,7 +16,7 @@ REGION_CODES = {
     "75": "NAQ",  # Nouvelle-Aquitaine
     "76": "OCC",  # Occitanie
     "52": "PDL",  # Pays de la Loire
-    "93": "PAC"   # Provence-Alpes-Côte d'Azur
+    "93": "PAC",   # Provence-Alpes-Côte d'Azur
 }
 
 DOM_DEPARTMENTS = ["971", "972", "973", "974", "976"]
@@ -25,7 +25,6 @@ DOM_DEPARTMENTS = ["971", "972", "973", "974", "976"]
 def load_data(selected_year: int):  # noqa: ANN201
     geojson_file = "data/cleaned/french_communes.geojson"
     geo_data = gpd.read_file(geojson_file)
-    geo_data = geo_data[~geo_data["dep"].isin(DOM_DEPARTMENTS)]
 
     crime_data = pd.read_csv("data/cleaned/crimes_france_2.csv")
     year_crime_data = crime_data[crime_data["Year"] == selected_year]
@@ -105,6 +104,10 @@ def register_callbacks(app) -> None:
                 left_on="libgeo",
                 right_on="City",
             )
+            current_geo_data["Crime_Rate"] = current_geo_data["Crime_Rate"].fillna(0)
+            current_geo_data["Cases"] = current_geo_data["Cases"].fillna(0)
+            current_geo_data["POP"] = current_geo_data["POP"].fillna(0)
+
             hover_name = "libgeo"
             hover_data = {
                 "Crime_Rate": ":.3f",
@@ -115,8 +118,13 @@ def register_callbacks(app) -> None:
             crime_summary = compute_crime_summary(year_crime_data, city_dept_mapping, view_type)
             current_geo_data, hover_name, hover_data = prepare_geo_data(geo_data, crime_summary, view_type)
 
-        min_value = current_geo_data["Crime_Rate"].quantile(0.1)
-        max_value = current_geo_data["Crime_Rate"].quantile(0.9)
+        crime_rates = current_geo_data["Crime_Rate"].dropna()
+        if len(crime_rates) > 0:
+            min_value = crime_rates.quantile(0.1)
+            max_value = crime_rates.quantile(0.9)
+        else:
+            min_value = 0
+            max_value = 100
 
         fig = px.choropleth_mapbox(
             current_geo_data,
